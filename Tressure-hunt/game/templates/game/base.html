@@ -1,0 +1,314 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Treasure Hunt</title>
+
+    <style>
+        :root {
+            --glow-purple: #9b7dff;
+            --glow-cyan: #57e1f2;
+            --gold: #ffd484;
+            color-scheme: dark;
+            --bg: #0b0e19;
+            --panel: #171b2e;
+            --card: #222840;
+            --border: #3a4565;
+            --text: #f6f7ff;
+            --muted: #b0b8d0;
+            --blue: #a994ff;
+            --green: #59eab6;
+            --red: #ea4335;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+            font-size: 15px;
+        }
+
+        button, input, select, textarea {
+            font: inherit;
+        }
+
+        button { cursor: pointer; }
+
+        button:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        .topbar {
+            height: 68px;
+            padding: 0 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            border-bottom: 1px solid #303134;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .brand-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: #394b66;
+            color: var(--blue);
+            display: grid;
+            place-items: center;
+        }
+
+        .brand-icon svg {
+            width: 23px;
+            height: 23px;
+        }
+
+        .header-label {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .page {
+            width: min(1440px, 100%);
+            margin: auto;
+            padding: 26px 28px 40px;
+        }
+
+        .form-layout {
+            min-height: calc(100vh - 135px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .form-card {
+            background: var(--panel);
+            border: 1px solid #45474b;
+            border-radius: 20px;
+            padding: 36px;
+            width: min(480px, 100%);
+        }
+
+        h1 {
+            font-size: 29px;
+            font-weight: 500;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 20px;
+            font-weight: 500;
+            margin: 0 0 16px;
+        }
+
+        h3 {
+            font-size: 16px;
+            margin: 0 0 12px;
+        }
+
+        .muted { color: var(--muted); }
+        .small { font-size: 13px; }
+
+        .form-subtitle {
+            color: var(--muted);
+            line-height: 1.6;
+            margin: 0 0 28px;
+        }
+
+        .form-card form p { margin: 0 0 18px; }
+
+        .form-card label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .form-card input,
+        .form-card select,
+        .form-card textarea {
+            display: block;
+            width: 100%;
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 13px;
+            outline: none;
+        }
+
+        .form-card input:focus,
+        .form-card select:focus,
+        .form-card textarea:focus {
+            border-color: var(--blue);
+        }
+
+        .form-card .helptext,
+        .form-card ul {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .form-card .errorlist { color: #f28b82; }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            min-height: 45px;
+            padding: 12px 19px;
+            background: var(--blue);
+            color: #202124;
+            border: 0;
+            border-radius: 24px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #aecbfa;
+        }
+
+        .btn-full { width: 100%; }
+
+        .btn-secondary {
+            background: var(--card);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #494c50;
+        }
+
+        .surface {
+            background: var(--panel);
+            border: 1px solid #45474b;
+            border-radius: 16px;
+            padding: 24px;
+        }
+
+        .notice {
+            padding: 13px 16px;
+            margin: 12px 0;
+            color: #c9dcfa;
+            background: #2c3b50;
+            border: 1px solid #526985;
+            border-radius: 10px;
+        }
+
+        .eyebrow {
+            color: var(--blue);
+            font-size: 11px;
+            letter-spacing: .14em;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 25px;
+            border: 1px solid #53565a;
+            color: #bdc1c6;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .divider {
+            height: 1px;
+            background: #414347;
+            margin: 22px 0;
+        }
+
+        @media (max-width: 650px) {
+            .topbar { padding: 0 15px; }
+            .header-label { display: none; }
+            .page { padding: 16px 14px 28px; }
+            .form-card { padding: 22px; }
+        }
+    </style>
+
+
+    <style>
+        body{background: radial-gradient(ellipse 650px 450px at 9% 0%,#37225e55,transparent 73%),radial-gradient(ellipse 560px 390px at 95% 10%,#123b6155,transparent 75%),#0b0e19;min-height:100vh}
+        body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.07;background-image:linear-gradient(#c4c5ff 1px,transparent 1px),linear-gradient(90deg,#c4c5ff 1px,transparent 1px);background-size:52px 52px;mask-image:linear-gradient(to bottom,black,transparent 85%)}
+        .topbar{height:78px;background:#101425d9;backdrop-filter:blur(20px);border-bottom:1px solid #48507666;position:relative;z-index:3}
+        .brand-icon{background:linear-gradient(145deg,#a98aff,#6964f5);color:#fff;box-shadow:0 4px 20px #877aff55;transform:rotate(-6deg)}
+        .brand-wordmark{display:flex;flex-direction:column;font-weight:900;font-size:19px;letter-spacing:.06em;line-height:1.02}
+        .brand-accent{color:#aa99ff}.brand-wordmark small{font-size:9px;color:#aab3d0;letter-spacing:.19em;margin-top:6px;font-weight:600;text-transform:uppercase}
+        .header-label{color:#65e8c3;font-size:11px;font-weight:800;letter-spacing:.09em;background:#1b3d3c;border:1px solid #2e6e60;border-radius:99px;padding:10px 15px}
+        .page{position:relative;z-index:1;max-width:1480px;padding-top:34px}
+        h1,h2,h3{letter-spacing:-.035em}h1{font-weight:800}
+        .surface,.form-card{background:linear-gradient(145deg,#202541e8,#14192dee);border-color:#394263;box-shadow:0 16px 52px #03050b60}
+        .form-card{position:relative;overflow:hidden;border-radius:26px;padding:46px;box-shadow:0 30px 90px #0008,0 0 65px #7353dc1a}
+        .form-card::before{content:"";display:block;position:absolute;left:0;right:0;top:0;height:5px;background:linear-gradient(90deg,#746af8,#ba83f8,#55dfed)}
+        .form-card h1{font-size:clamp(32px,4vw,42px);line-height:1.1;margin:14px 0 18px}
+        .eyebrow{color:#9e9aff;font-weight:900;letter-spacing:.17em}
+        .form-card input,.form-card select,.form-card textarea{background:#11172b;border-color:#404869;padding:15px;border-radius:12px}
+        .btn{border-radius:12px;background:linear-gradient(110deg,#9e8bff,#6b9dff);color:#0c1121;box-shadow:0 7px 26px #776cf344;font-weight:900;transition:transform .2s,filter .2s,box-shadow .2s}
+        .btn:hover:not(:disabled){background:linear-gradient(110deg,#b6a7ff,#83b6ff);transform:translateY(-2px);box-shadow:0 10px 32px #8575ff66}
+        .tag{background:#ffffff0a;border-color:#56617b;color:#d9dcf5}
+        .notice{background:#283050;border-color:#596caa}
+        @media(max-width:650px){.form-card{padding:28px}.header-label{display:none}}
+        @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <header class="topbar">
+        <a href="/" class="brand">
+            <span class="brand-icon">
+                <svg viewBox="0 0 24 24" fill="none"
+                     stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="5" width="12" height="14" rx="3"/>
+                    <path d="m15 10 6-4v12l-6-4"/>
+                </svg>
+            </span>
+            <span class="brand-wordmark">QUEST<span class="brand-accent">ROOM</span><small>AI treasure hunt</small></span>
+        </a>
+
+        <span class="header-label">● LIVE COLLABORATIVE EXPERIENCE</span>
+    </header>
+
+    <main class="page">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

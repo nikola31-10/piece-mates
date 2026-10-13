@@ -1,0 +1,48 @@
+{
+  "challenges": [
+    {
+      "image": "challenge_1.png",
+      "objects": [
+        {
+          "name": "stapler",
+          "x": 0.053,
+          "y": 0.681
+        }
+      ],
+      "hint": "Look near the desk."
+    },
+    {
+      "image": "challenge_2.png",
+      "objects": [
+        {
+          "name": "paper clip",
+          "x": 0.644,
+          "y": 0.665
+        }
+      ],
+      "hint": "Check the jacket collar."
+    },
+    {
+      "image": "challenge_3.png",
+      "objects": [
+        {
+          "name": "pen",
+          "x": 0.223,
+          "y": 0.936
+        }
+      ],
+      "hint": "Look near the bottom edge."
+    },
+    {
+      "image": "challenge_4.png",
+      "objects": [
+        {
+          "name": "notebook",
+          "x": 0.765,
+          "y": 0.934
+        }
+      ],
+      "hint": "Look near the corner of the desk."
+    }
+  ]
+}

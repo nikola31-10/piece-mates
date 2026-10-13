@@ -1,0 +1,1550 @@
+
+{% extends "game/base.html" %}
+
+{% block content %}
+
+<div class="room-heading">
+    <div>
+        <div class="eyebrow">✦ Your adventure starts here</div>
+        <h1><span class="room-title-text">{{ game_session.name }}</span><span class="title-spark"> ✳</span></h1>
+
+        <p class="muted">
+            {{ game_session.theme }} ·
+            {% if current_participant %}
+                Playing as {{ current_participant.name }}
+            {% else %}
+                Organizer view
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="heading-tags">
+        <span class="tag">
+            <span class="status-dot"></span>
+            {{ game_session.status }}
+        </span>
+        <span class="tag">
+            👥 {{ participants|length }} participants
+        </span>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="notice">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<!-- GAME CONFIGURATION -->
+
+{% if current_participant %}
+    <div id="game-config"
+         data-state-url="{% url 'player_game_state' game_session.id current_participant.access_token %}"
+         data-check-url="{% url 'check_object' game_session.id current_participant.access_token %}"
+         data-status="{{ game_session.status }}"
+         data-participant-count="{{ participants|length }}"
+         data-unlocked-count="{{ game_session.unlocked_pieces }}"
+         hidden>
+    </div>
+{% else %}
+    <div id="game-config"
+         data-state-url="{% url 'game_state' game_session.id %}"
+         data-check-url=""
+         data-status="{{ game_session.status }}"
+         data-participant-count="{{ participants|length }}"
+         data-unlocked-count="{{ game_session.unlocked_pieces }}"
+         hidden>
+    </div>
+{% endif %}
+
+<div class="room-layout">
+
+    <div class="room-main">
+
+        <!-- LOBBY -->
+
+        {% if game_session.status == "LOBBY" %}
+
+            <section class="meeting-stage">
+                <div class="stage-circle stage-orbit"><span>🧩</span></div>
+
+                <h2>Gather your dream team</h2>
+
+                <p class="muted">
+                    The adventure is almost here. Invite your crew, gear up, and unlock the mystery together.
+                </p>
+
+                <span class="tag">
+                    <span class="status-dot"></span>
+                    {{ participants|length }} people in the room
+                </span>
+            </section>
+
+            <!-- INVITE CTA -->
+
+            {% if is_organizer and join_url %}
+                <section class="invite-banner">
+
+                    <div class="invite-icon">🔗</div>
+
+                    <div class="invite-content">
+                        <h2>Your team. Your quest.</h2>
+
+                        <p>
+                            One link is all it takes. Share it with your team and start the adventure.
+                        </p>
+
+                        <div class="invite-url" id="invite-url">
+                            {{ join_url }}
+                        </div>
+
+                        <button id="copy-invite"
+                                class="btn invite-button"
+                                type="button"
+                                data-link="{{ join_url }}">
+                            <span aria-hidden="true">▣</span>
+                            <span id="copy-label">
+                                Copy invitation link
+                            </span>
+                        </button>
+
+                        <p id="copy-feedback"
+                           class="copy-feedback"
+                           aria-live="polite"></p>
+                    </div>
+                </section>
+            {% endif %}
+
+            <!-- PARTICIPANTS -->
+
+            <div class="section-heading">
+                <h2>Your adventurers</h2>
+                <span class="muted">
+                    {{ participants|length }} joined
+                </span>
+            </div>
+
+            <div class="people-grid">
+                {% for participant in participants %}
+
+                    <div class="person-tile">
+
+                        {% if participant.photo %}
+                            <img
+                                class="person-avatar"
+                                src="{{ participant.photo.url }}"
+                                alt="{{ participant.name }}"
+                            >
+                        {% else %}
+                            <div class="person-avatar avatar-placeholder">
+                                {{ participant.name|first|upper }}
+                            </div>
+                        {% endif %}
+
+                        <strong class="person-name">
+                            {{ participant.name }}
+                        </strong>
+
+                        <span class="person-ready">● Ready</span>
+                    </div>
+
+                {% empty %}
+                    <div class="empty-people">
+                        No one has joined yet.
+                        Share the invitation link to get started.
+                    </div>
+                {% endfor %}
+            </div>
+
+        <!-- GENERATING -->
+
+        {% elif game_session.status == "GENERATING" %}
+
+            <section class="meeting-stage">
+                <div class="stage-circle">🎨</div>
+
+                <h2>Preparing your experience</h2>
+
+                <p class="muted">
+                    Preparing the group picture
+                    and hidden-object challenges.
+                </p>
+
+                <div class="loading-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </section>
+
+        <!-- ACTIVE GAME -->
+
+        {% elif game_session.status == "ACTIVE" %}
+
+            <section class="surface game-panel">
+
+                <div class="section-heading">
+                    <div>
+                        <div class="eyebrow">Team objective</div>
+                        <h2>Unlock the big reveal</h2>
+                    </div>
+
+                    <span class="tag">
+                        {{ game_session.unlocked_pieces }}/{{ game_session.total_participants }}
+                        pieces
+                    </span>
+                </div>
+
+                <p class="muted">
+                    Each mission uncovers a piece of your final team masterpiece.
+                </p>
+
+                <!-- PROGRESS -->
+
+                <div class="progress-track">
+                    <div
+                        id="game-progress"
+                        class="progress-fill"
+                        data-progress="{{ game_session.progress_percentage }}"
+                    ></div>
+                </div>
+
+                <p class="progress-caption">
+                    {{ game_session.progress_percentage }}% completed
+                </p>
+
+                <!-- DYNAMIC IMAGE PUZZLE -->
+
+                <div id="picture-puzzle"
+                     class="picture-puzzle"
+                     {% if game_session.final_image %}
+                         data-image="{{ game_session.final_image.url }}"
+                     {% endif %}>
+
+                    {% for piece in game_session.puzzle_pieces.all %}
+
+                        <div class="picture-piece {% if piece.unlocked %}revealed{% else %}hidden-piece{% endif %}">
+
+                            <div class="piece-picture"></div>
+
+                            <div class="piece-overlay">
+                                <span class="piece-number">
+                                    {{ forloop.counter }}
+                                </span>
+                            </div>
+
+                            <span class="piece-name">
+                                {{ piece.participant.name }}
+                            </span>
+
+                        </div>
+
+                    {% endfor %}
+                </div>
+
+                {% if not game_session.final_image %}
+                    <p class="image-warning">
+                        Generated group image is not available yet.
+                    </p>
+                {% endif %}
+
+                <p class="picture-progress">
+                    {{ game_session.unlocked_pieces }}
+                    of {{ game_session.total_participants }}
+                    sections revealed
+                </p>
+
+            </section>
+
+            <!-- CHALLENGE -->
+
+            {% if my_challenge %}
+                <section class="surface challenge-panel">
+
+                    <div class="eyebrow">Your personal mission</div>
+
+                    <h2>Find it. Tap it. Reveal it.</h2>
+
+                    {% if my_challenge.completed %}
+
+                        <div class="success-box">
+                            <h3>✓ Challenge completed!</h3>
+
+                            <p>
+                                You revealed your section of the picture.
+                                Waiting for other teammates...
+                            </p>
+                        </div>
+
+                    {% else %}
+
+                        <p class="muted">
+                            Find all the listed objects.
+                            Click directly on each object in the image.
+                        </p>
+
+                        <div id="objects-list" class="objects-list">
+                            {% for object in my_challenge.hidden_objects %}
+                                <span class="object-chip">
+                                    🎯 {{ object.name }}
+                                </span>
+                            {% endfor %}
+                        </div>
+
+                        {% if my_challenge.image %}
+                            <img
+                                id="challenge-image"
+                                src="{{ my_challenge.image.url }}"
+                                alt="Hidden objects challenge"
+                            >
+                        {% endif %}
+
+                        <p id="click-result" aria-live="polite"></p>
+
+                    {% endif %}
+                </section>
+
+            {% elif not is_organizer %}
+                <div class="notice">
+                    Your challenge is not available.
+                </div>
+            {% endif %}
+
+        <!-- COMPLETED -->
+
+        {% elif game_session.status == "COMPLETED" %}
+
+            <section class="surface completed-panel">
+                <div class="complete-emoji">🎉</div>
+
+                <div class="eyebrow">Mission complete</div>
+
+                <h2>THE BIG REVEAL!</h2>
+
+                <p class="muted">
+                    Everyone has completed their challenges.
+                    The entire picture is revealed!
+                </p>
+
+                {% if game_session.final_image %}
+                    <img
+                        class="final-photo"
+                        src="{{ game_session.final_image.url }}"
+                        alt="Final group photo"
+                    >
+
+                    <a class="btn"
+                       href="{{ game_session.final_image.url }}"
+                       download>
+                        ↓ Download group photo
+                    </a>
+                {% endif %}
+            </section>
+
+        {% endif %}
+
+    </div>
+
+    <!-- SIDEBAR -->
+
+    <aside class="room-sidebar">
+
+        <section class="surface sidebar-section">
+
+            <div class="section-heading">
+                <h3>Quest intel</h3>
+                <span class="muted">ⓘ</span>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Room name</span>
+                <strong>{{ game_session.name }}</strong>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Theme</span>
+                <strong>{{ game_session.theme }}</strong>
+            </div>
+
+            <div class="detail-item">
+                <span class="detail-label">Participants</span>
+                <strong>{{ participants|length }} people</strong>
+            </div>
+
+        </section>
+
+        <!-- HOST CONTROLS -->
+
+        {% if game_session.status == "LOBBY" %}
+
+            {% if is_organizer %}
+
+                <section class="surface sidebar-section">
+                    <h3>Mission control</h3>
+
+                    <p class="muted small">
+                        At least 2 players are required.
+                    </p>
+
+                    <form method="post"
+                          action="{% url 'start_game' game_session.id %}">
+                        {% csrf_token %}
+
+                        <button type="submit"
+                                class="btn btn-full"
+                                {% if participants|length < 2 %}disabled{% endif %}>
+                            ▶ Start game
+                        </button>
+                    </form>
+                </section>
+
+            {% else %}
+
+                <section class="surface sidebar-section">
+                    <h3>You're ready ✓</h3>
+
+                    <p class="muted small">
+                        Waiting for the organizer to start.
+                    </p>
+                </section>
+
+            {% endif %}
+        {% endif %}
+
+        <!-- PREPARE GAME -->
+
+        {% if game_session.status == "GENERATING" %}
+
+            <section class="surface sidebar-section">
+                <h3>Game setup</h3>
+
+                {% if is_organizer %}
+                    <p class="muted small">
+                        Load the prepared group picture
+                        and hidden-object challenges.
+                    </p>
+
+                    <form method="post"
+                          action="{% url 'prepare_demo' game_session.id %}">
+                        {% csrf_token %}
+
+                        <button type="submit" class="btn btn-full">
+                            Prepare game
+                        </button>
+                    </form>
+
+                {% else %}
+                    <p class="muted small">
+                        The organizer is preparing your challenges.
+                    </p>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        <!-- PLAYER PROGRESS -->
+
+        {% if game_session.status == "ACTIVE" and is_organizer %}
+
+            <section class="surface sidebar-section">
+                <h3>Live team progress</h3>
+
+                {% for piece in game_session.puzzle_pieces.all %}
+
+                    <div class="progress-person">
+                        <span>{{ piece.participant.name }}</span>
+
+                        {% if piece.unlocked %}
+                            <span class="progress-done">✓ Revealed</span>
+                        {% else %}
+                            <span class="muted">⏳ Playing</span>
+                        {% endif %}
+                    </div>
+
+                {% endfor %}
+            </section>
+
+        {% endif %}
+
+    </aside>
+</div>
+
+<!-- BOTTOM BAR -->
+
+<footer class="meeting-toolbar">
+
+    <span class="toolbar-room">
+        {{ game_session.name }}
+    </span>
+
+    <span class="toolbar-count">
+        👥 {{ participants|length }}
+    </span>
+
+</footer>
+
+{% endblock %}
+
+
+{% block extra_css %}
+
+<style>
+.room-heading,
+.heading-tags,
+.section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.room-heading { margin-bottom: 24px; }
+.room-heading h1 { font-size: 28px; margin: 0 0 8px; }
+.room-heading p { margin: 0; }
+.heading-tags { justify-content: flex-start; }
+.section-heading { margin-bottom: 16px; }
+.section-heading h2,
+.section-heading h3 { margin: 0; }
+
+.room-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    align-items: start;
+    gap: 20px;
+}
+
+.room-main,
+.room-sidebar {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.meeting-stage {
+    min-height: 275px;
+    padding: 30px;
+    background: var(--tile);
+    border-radius: 15px;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.meeting-stage p {
+    line-height: 1.6;
+    max-width: 430px;
+}
+
+.stage-circle {
+    width: 82px;
+    height: 82px;
+    background: #455c7d;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-size: 35px;
+    margin-bottom: 18px;
+}
+
+/* INVITE */
+
+.invite-banner {
+    display: flex;
+    gap: 20px;
+    padding: 25px;
+    background: #29394f;
+    border: 1px solid #5879a8;
+    border-radius: 16px;
+}
+
+.invite-icon {
+    width: 58px;
+    height: 58px;
+    flex-shrink: 0;
+    border-radius: 14px;
+    background: #3b5577;
+    display: grid;
+    place-items: center;
+    font-size: 27px;
+}
+
+.invite-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.invite-banner h2 {
+    color: #e8f0fe;
+    font-size: 21px;
+    margin-bottom: 9px;
+}
+
+.invite-banner p {
+    color: #c2d5ef;
+    line-height: 1.5;
+}
+
+.invite-url {
+    background: #202b3a;
+    border: 1px solid #627d9f;
+    border-radius: 9px;
+    padding: 13px;
+    margin: 15px 0;
+    color: #d5e3fa;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.invite-button { min-width: 225px; }
+.invite-button.copied { background: var(--green); }
+
+.copy-feedback {
+    color: var(--green) !important;
+    font-size: 13px;
+    min-height: 16px;
+    margin: 10px 0 0;
+}
+
+/* PEOPLE */
+
+.people-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 13px;
+}
+
+.person-tile {
+    background: var(--tile);
+    border-radius: 12px;
+    padding: 18px;
+    min-height: 195px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.person-avatar {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    background: #536e95;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 35px;
+}
+
+.person-name {
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.person-ready,
+.progress-done {
+    color: var(--green);
+    font-size: 12px;
+}
+
+.empty-people {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 36px;
+    border-radius: 12px;
+    background: var(--tile);
+}
+
+/* SIDEBAR */
+
+.sidebar-section { padding: 22px; }
+
+.detail-item {
+    border-bottom: 1px solid #414347;
+    padding: 14px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.detail-item:last-child { border: 0; }
+
+.detail-label {
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.detail-item strong {
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.sidebar-section form { margin-top: 18px; }
+
+.progress-person {
+    padding: 13px 0;
+    border-bottom: 1px solid #414347;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+}
+
+/* PROGRESS */
+
+.progress-track {
+    height: 10px;
+    width: 100%;
+    background: var(--tile);
+    overflow: hidden;
+    border-radius: 20px;
+    margin-top: 24px;
+}
+
+.progress-fill {
+    width: 0;
+    height: 100%;
+    background: var(--green);
+    transition: width .3s;
+}
+
+.progress-caption {
+    color: var(--muted);
+    font-size: 13px;
+    text-align: right;
+}
+
+/* DYNAMIC PICTURE PUZZLE */
+
+.picture-puzzle {
+    position: relative;
+    width: 100%;
+    max-width: 850px;
+    margin: 24px auto 0;
+    aspect-ratio: 4 / 3;
+    background: #303134;
+    overflow: hidden;
+    border: 3px solid var(--border);
+    border-radius: 14px;
+}
+
+.picture-piece {
+    position: absolute;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: #34363b;
+    border: 1.5px solid #202124;
+}
+
+.piece-picture {
+    position: absolute;
+    inset: 0;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity .6s ease;
+}
+
+.picture-piece.revealed .piece-picture {
+    opacity: 1;
+}
+
+.piece-overlay {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    background: #303134;
+}
+
+.piece-number {
+    font-size: clamp(20px, 4vw, 44px);
+    color: #9aa0a6;
+    font-weight: 600;
+}
+
+.picture-piece.revealed .piece-overlay {
+    display: none;
+}
+
+.piece-name {
+    position: absolute;
+    bottom: 6px;
+    left: 6px;
+    max-width: calc(100% - 12px);
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    color: #e8eaed;
+    background: #202124cb;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    z-index: 2;
+}
+
+.picture-puzzle.all-revealed {
+    border: 0;
+}
+
+.picture-puzzle.all-revealed .picture-piece {
+    border: 0;
+}
+
+.picture-puzzle.all-revealed .piece-name {
+    display: none;
+}
+
+.picture-progress,
+.image-warning {
+    color: var(--muted);
+    text-align: center;
+    font-size: 13px;
+    margin: 14px 0 0;
+}
+
+/* CHALLENGE */
+
+.objects-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    margin: 22px 0;
+}
+
+.object-chip {
+    background: var(--tile);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 9px 13px;
+    font-size: 13px;
+}
+
+#challenge-image {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 13px;
+    cursor: crosshair;
+}
+
+#click-result {
+    min-height: 22px;
+    font-weight: 600;
+}
+
+.success-box {
+    background: #254230;
+    border: 1px solid #56866a;
+    text-align: center;
+    border-radius: 13px;
+    padding: 30px;
+}
+
+.success-box h3 { color: var(--green); }
+
+.completed-panel {
+    text-align: center;
+    padding: 40px;
+}
+
+.complete-emoji {
+    font-size: 55px;
+    margin-bottom: 20px;
+}
+
+.final-photo {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 13px;
+    margin: 25px 0;
+}
+
+/* LOADING */
+
+.loading-dots {
+    display: flex;
+    gap: 9px;
+    margin-top: 20px;
+}
+
+.loading-dots span {
+    width: 9px;
+    height: 9px;
+    background: var(--blue);
+    border-radius: 50%;
+    animation: dotpulse 1.1s infinite alternate;
+}
+
+.loading-dots span:nth-child(2) {
+    animation-delay: .2s;
+}
+
+.loading-dots span:nth-child(3) {
+    animation-delay: .4s;
+}
+
+@keyframes dotpulse {
+    to {
+        opacity: .2;
+        transform: translateY(-5px);
+    }
+}
+
+/* BOTTOM BAR */
+
+.meeting-toolbar {
+    position: sticky;
+    z-index: 10;
+    bottom: 10px;
+    margin-top: 25px;
+    padding: 15px 20px;
+    border-radius: 16px;
+    border: 1px solid var(--tile);
+    background: var(--bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.toolbar-room,
+.toolbar-count {
+    flex: 1;
+}
+
+.toolbar-room {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.toolbar-count {
+    text-align: right;
+    color: var(--muted);
+}
+
+.toolbar-controls {
+    display: flex;
+    gap: 13px;
+}
+
+.toolbar-circle {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    background: var(--tile);
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+}
+
+.blue-circle {
+    background: var(--blue);
+    color: var(--bg);
+}
+
+/* RESPONSIVE */
+
+@media (max-width: 950px) {
+    .room-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .room-sidebar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+}
+
+@media (max-width: 650px) {
+    .people-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .person-tile { min-height: 160px; }
+
+    .person-avatar {
+        height: 65px;
+        width: 65px;
+    }
+
+    .invite-banner {
+        flex-direction: column;
+        padding: 20px;
+    }
+
+    .invite-button { width: 100%; }
+
+    .toolbar-room,
+    .toolbar-count { display: none; }
+
+    .meeting-toolbar { justify-content: center; }
+
+    .piece-name {
+        font-size: 9px;
+        padding: 3px 4px;
+    }
+
+    .completed-panel { padding: 20px; }
+}
+
+/* SHOWCASE REDESIGN — retains all Django hooks and JS */
+.room-heading{margin:2px 0 34px;padding:17px 0 10px;gap:22px}
+.room-heading h1{font-size:clamp(36px,5vw,63px);line-height:1.04;margin:9px 0 14px;font-weight:900;letter-spacing:-.055em}
+.room-title-text{background:linear-gradient(105deg,#fff 5%,#c6b7ff 55%,#75dff9);-webkit-background-clip:text;background-clip:text;color:transparent}
+.title-spark{font-size:.6em;color:#85e1ff;vertical-align:top;display:inline-block;animation:spinpop 6s ease-in-out infinite}
+.room-heading p{font-size:15px;color:#bac5df}.heading-tags .tag{padding:11px 17px}
+.meeting-stage{min-height:330px;border:1px solid #51609d;background:radial-gradient(circle at 50% 18%,#6c55b355,transparent 57%),linear-gradient(145deg,#242b50,#151c38);box-shadow:inset 0 1px #acb6ff33,0 20px 60px #0005;position:relative;overflow:hidden;border-radius:24px}
+.meeting-stage::after{content:"✧    ✦    ·    ✧    ✦";position:absolute;top:22px;right:22px;color:#e7ddff66;letter-spacing:13px;font-size:23px}
+.meeting-stage h2{font-size:clamp(25px,3vw,36px);font-weight:900;margin:16px 0 6px}
+.meeting-stage .tag{margin-top:14px;background:#293d4f;border-color:#337b73;color:#abfce1}
+.stage-circle{width:104px;height:104px;background:linear-gradient(150deg,#ab8fff,#5e8cf6);box-shadow:0 0 0 12px #a494ff17,0 0 0 29px #a494ff0b,0 18px 40px #686af788;font-size:47px}
+.stage-orbit{animation:float 4s ease-in-out infinite}
+.invite-banner{border:1px solid #8f7bff;background:linear-gradient(120deg,#4d3978,#253b64 85%);padding:30px;border-radius:24px;box-shadow:0 12px 45px #7561ec29;position:relative;overflow:hidden}
+.invite-banner::after{content:"↗";position:absolute;top:-36px;right:30px;font-size:190px;color:#ffffff0c;font-weight:900;pointer-events:none}
+.invite-content{position:relative;z-index:1}.invite-banner h2{font-size:clamp(23px,3vw,30px);font-weight:900;letter-spacing:-.04em;color:white}
+.invite-banner p{color:#e1def7}.invite-icon{width:66px;height:66px;border-radius:19px;background:#ffffff25;font-size:30px}
+.invite-url{background:#080d234d;border:1px solid #b6a6ff66;color:#f1efff;padding:17px;border-radius:13px}
+.invite-button{min-height:53px;font-size:15px;background:linear-gradient(100deg,#d1baff,#86c9ff)}
+.section-heading h2{font-size:24px;font-weight:900}.people-grid{gap:15px}
+.person-tile{min-height:214px;border:1px solid #434e74;background:linear-gradient(155deg,#303757,#1c223a);border-radius:20px;transition:transform .25s,border-color .25s,box-shadow .25s;position:relative;overflow:hidden}
+.person-tile::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#9e93ff,transparent);opacity:.7}
+.person-tile:hover{transform:translateY(-5px);border-color:#9e95ff;box-shadow:0 16px 28px #03061578}
+.person-avatar{box-shadow:0 0 0 5px #a18fff28,0 8px 30px #0006;border:2px solid #b7a8ff}
+.person-name{font-size:16px}.person-ready{font-size:12px;background:#1c584550;padding:7px 12px;border-radius:99px;font-weight:800}
+.sidebar-section{border-radius:20px;background:linear-gradient(155deg,#202844,#151b31);border:1px solid #414d70}
+.sidebar-section h3{font-size:18px;font-weight:900;color:#f6f3ff}.detail-label{color:#aab4d4}.detail-item{border-color:#404b6b}
+.progress-track{height:13px;border-radius:100px;background:#0e1529;border:1px solid #454d77;overflow:hidden}
+.progress-fill{background:linear-gradient(90deg,#8f7bff,#5fe4d0);box-shadow:0 0 24px #56e9c477}
+.progress-caption{color:#8fead9;font-weight:800}.picture-puzzle{border:4px solid #655f9c;border-radius:20px;box-shadow:0 16px 45px #0008,0 0 32px #8575ff25}
+.picture-piece{background:#1d2540;border:1.5px solid #14182e}.piece-overlay{background:radial-gradient(circle at center,#45416c,#252a47)}
+.piece-number{font-size:clamp(25px,4vw,53px);font-weight:900;color:#bcb1f8;text-shadow:0 0 25px #a796ff66}
+.picture-piece.revealed{animation:reveal .7s ease backwards}.picture-piece.revealed .piece-picture{opacity:1}
+.picture-progress{color:#aebbf0;font-weight:800;font-size:14px}
+.game-panel,.challenge-panel{border-color:#4c5487;box-shadow:0 15px 50px #04071a5e}
+.objects-list .object-chip{border-color:#776cba;background:#43396d75;color:#e9e1ff;font-weight:700}
+#challenge-image{border:3px solid #69719e;box-shadow:0 10px 35px #0006}
+.success-box{background:linear-gradient(140deg,#1a5b50,#14362c);border-color:#45ab8e;border-radius:20px}
+.completed-panel{background:radial-gradient(circle at top,#5d457b99,transparent 70%),#171b31;border-color:#8279c2;border-radius:24px}
+.completed-panel h2{font-size:clamp(28px,4vw,45px);font-weight:900;color:#edd6ff}
+.meeting-toolbar{background:#161d33ee;backdrop-filter:blur(18px);border:1px solid #55618e;border-radius:20px;box-shadow:0 14px 40px #0008}
+.toolbar-room{font-weight:800}.toolbar-count{color:#b5adff;font-weight:800}
+@keyframes float{50%{transform:translateY(-8px)}}
+@keyframes spinpop{50%{transform:rotate(35deg) scale(1.1)}}
+@keyframes reveal{from{filter:brightness(2);transform:scale(.97)}to{filter:brightness(1);transform:scale(1)}}
+@media(max-width:650px){.room-heading h1{font-size:35px}.meeting-stage{min-height:280px}.invite-banner{padding:22px}.person-tile{min-height:170px}}
+
+</style>
+
+{% endblock %}
+
+
+{% block extra_js %}
+
+<script>
+(() => {
+    const config = document.getElementById("game-config");
+
+    if (!config) return;
+
+    const stateUrl = config.dataset.stateUrl;
+    const checkUrl = config.dataset.checkUrl;
+
+    const initialStatus = config.dataset.status;
+    const initialParticipantCount =
+        Number(config.dataset.participantCount);
+    const initialUnlockedCount =
+        Number(config.dataset.unlockedCount);
+
+    let reloading = false;
+    let checkingObject = false;
+    let polling = false;
+
+    // CSRF
+
+    function getCookie(name) {
+        for (const cookie of document.cookie.split(";")) {
+            const trimmed = cookie.trim();
+
+            if (trimmed.startsWith(name + "=")) {
+                return decodeURIComponent(
+                    trimmed.substring(name.length + 1)
+                );
+            }
+        }
+
+        return "";
+    }
+
+    // PROGRESS BAR
+
+    const progressBar =
+        document.getElementById("game-progress");
+
+    if (progressBar) {
+        const percentage =
+            Number(progressBar.dataset.progress) || 0;
+
+        progressBar.style.width =
+            `${Math.max(0, Math.min(100, percentage))}%`;
+    }
+
+    // =======================================
+    // DYNAMIC IMAGE PUZZLE
+    // =======================================
+
+    // Every participant receives exactly 1/N
+    // of the original picture.
+
+    function puzzleRects(count) {
+
+        if (count === 1) {
+            return [
+                { x: 0, y: 0, w: 100, h: 100 }
+            ];
+        }
+
+        // 2 PLAYERS - TWO VERTICAL HALVES
+
+        if (count === 2) {
+            return [
+                { x: 0, y: 0, w: 50, h: 100 },
+                { x: 50, y: 0, w: 50, h: 100 }
+            ];
+        }
+
+        // 3 PLAYERS - THREE HORIZONTAL ROWS
+
+        if (count === 3) {
+            return Array.from(
+                { length: 3 },
+                (_, i) => ({
+                    x: 0,
+                    y: i * 100 / 3,
+                    w: 100,
+                    h: 100 / 3
+                })
+            );
+        }
+
+        // ODD NUMBERS (5, 7, 9...)
+        //
+        // Two columns, with the last tile
+        // taking the entire width.
+        //
+        // Every tile has equal area.
+
+        if (count % 2 === 1 && (count === 5 || count === 7 || !Number.isInteger(Math.sqrt(count)))) {
+
+            const rectangles = [];
+            const pairRowHeight = 200 / count;
+
+            for (let i = 0; i < count - 1; i++) {
+
+                const row = Math.floor(i / 2);
+                const col = i % 2;
+
+                rectangles.push({
+                    x: col * 50,
+                    y: row * pairRowHeight,
+                    w: 50,
+                    h: pairRowHeight
+                });
+            }
+
+            rectangles.push({
+                x: 0,
+                y: 100 - 100 / count,
+                w: 100,
+                h: 100 / count
+            });
+
+            return rectangles;
+        }
+
+        // EVEN NUMBERS
+        // 4 -> 2x2
+        // 6 -> 3x2
+        // 8 -> 4x2
+        // 12 -> 4x3
+
+        let rows = Math.floor(Math.sqrt(count));
+
+        while (count % rows !== 0) {
+            rows--;
+        }
+
+        const columns = count / rows;
+
+        return Array.from(
+            { length: count },
+            (_, i) => ({
+                x: (i % columns) * 100 / columns,
+                y: Math.floor(i / columns) * 100 / rows,
+                w: 100 / columns,
+                h: 100 / rows
+            })
+        );
+    }
+
+    // POSITION PUZZLE PIECES
+
+    function initializePicturePuzzle() {
+
+        const puzzle =
+            document.getElementById("picture-puzzle");
+
+        if (!puzzle) return;
+
+        const pieces = Array.from(
+            puzzle.querySelectorAll(".picture-piece")
+        );
+
+        if (pieces.length === 0) return;
+
+        const rects = puzzleRects(pieces.length);
+        const imageUrl = puzzle.dataset.image;
+
+        pieces.forEach((piece, index) => {
+
+            const { x, y, w, h } = rects[index];
+
+            // Set tile dimensions and position
+
+            piece.style.left = `${x}%`;
+            piece.style.top = `${y}%`;
+            piece.style.width = `${w}%`;
+            piece.style.height = `${h}%`;
+
+            const picture =
+                piece.querySelector(".piece-picture");
+
+            if (!picture || !imageUrl) return;
+
+            // Use the same full image
+            // but show only the matching section.
+
+            picture.style.backgroundImage =
+                `url(${JSON.stringify(imageUrl)})`;
+
+            // Compensate for the tile's dimensions.
+
+            picture.style.backgroundSize =
+                `${10000 / w}% ${10000 / h}%`;
+
+            const posX = w >= 100
+                ? 0
+                : x / (100 - w) * 100;
+
+            const posY = h >= 100
+                ? 0
+                : y / (100 - h) * 100;
+
+            picture.style.backgroundPosition =
+                `${posX}% ${posY}%`;
+        });
+
+        // Remove borders when everything is revealed.
+
+        const allRevealed = pieces.every(
+            piece => piece.classList.contains("revealed")
+        );
+
+        if (imageUrl && allRevealed) {
+            puzzle.classList.add("all-revealed");
+        }
+
+        // Preserve image aspect ratio.
+
+        if (imageUrl) {
+            const image = new Image();
+
+            image.onload = () => {
+                if (
+                    image.naturalWidth &&
+                    image.naturalHeight
+                ) {
+                    puzzle.style.aspectRatio =
+                        `${image.naturalWidth} / ${image.naturalHeight}`;
+                }
+            };
+
+            image.src = imageUrl;
+        }
+    }
+
+    initializePicturePuzzle();
+
+    // =======================================
+    // COPY INVITATION LINK
+    // =======================================
+
+    const copyButton =
+        document.getElementById("copy-invite");
+
+    if (copyButton) {
+
+        copyButton.addEventListener("click", async () => {
+
+            const link = copyButton.dataset.link;
+            const label =
+                document.getElementById("copy-label");
+            const feedback =
+                document.getElementById("copy-feedback");
+
+            try {
+
+                if (!link) {
+                    throw new Error("Missing invitation link");
+                }
+
+                if (
+                    navigator.clipboard &&
+                    window.isSecureContext
+                ) {
+                    await navigator.clipboard.writeText(link);
+                } else {
+
+                    // Fallback for HTTP connections.
+
+                    const field =
+                        document.createElement("textarea");
+
+                    field.value = link;
+                    field.style.position = "fixed";
+                    field.style.opacity = "0";
+
+                    document.body.appendChild(field);
+
+                    field.focus();
+                    field.select();
+
+                    const copied =
+                        document.execCommand("copy");
+
+                    field.remove();
+
+                    if (!copied) {
+                        throw new Error("Copy unavailable");
+                    }
+                }
+
+                if (label) label.textContent = "Copied!";
+                copyButton.classList.add("copied");
+
+                if (feedback) {
+                    feedback.textContent =
+                        "✓ Invitation link copied.";
+                }
+
+                setTimeout(() => {
+                    if (label) {
+                        label.textContent =
+                            "Copy invitation link";
+                    }
+
+                    copyButton.classList.remove("copied");
+                }, 2300);
+
+            } catch (error) {
+
+                console.error("Copy failed:", error);
+
+                if (feedback) {
+                    feedback.textContent =
+                        "Copy failed. Please copy the link manually.";
+                }
+            }
+        });
+    }
+
+    // =======================================
+    // GAME STATE POLLING
+    // =======================================
+
+    async function checkGameUpdates() {
+
+        if (
+            reloading ||
+            checkingObject ||
+            polling ||
+            document.hidden
+        ) {
+            return;
+        }
+
+        polling = true;
+
+        try {
+
+            const response = await fetch(stateUrl, {
+                cache: "no-store"
+            });
+
+            if (!response.ok) return;
+
+            const data = await response.json();
+
+            const changed =
+                data.status !== initialStatus ||
+                Number(data.participant_count) !==
+                    initialParticipantCount ||
+                Number(data.unlocked_count) !==
+                    initialUnlockedCount;
+
+            if (changed) {
+                reloading = true;
+                window.location.reload();
+            }
+
+        } catch (error) {
+            console.error("Game update failed:", error);
+        } finally {
+            polling = false;
+        }
+    }
+
+    setInterval(checkGameUpdates, 2000);
+
+    document.addEventListener(
+        "visibilitychange",
+        () => {
+            if (!document.hidden) {
+                checkGameUpdates();
+            }
+        }
+    );
+
+    // =======================================
+    // HIDDEN OBJECT CLICK
+    // =======================================
+
+    const challengeImage =
+        document.getElementById("challenge-image");
+
+    const resultElement =
+        document.getElementById("click-result");
+
+    if (challengeImage && checkUrl) {
+
+        challengeImage.addEventListener(
+            "click",
+            async function(event) {
+
+                if (checkingObject || reloading) return;
+
+                const rect =
+                    challengeImage.getBoundingClientRect();
+
+                const x =
+                    (event.clientX - rect.left) / rect.width;
+
+                const y =
+                    (event.clientY - rect.top) / rect.height;
+
+                checkingObject = true;
+
+                try {
+
+                    const response = await fetch(checkUrl, {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRFToken": getCookie("csrftoken")
+                        },
+
+                        body: JSON.stringify({ x, y })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+
+                        resultElement.style.color =
+                            "var(--red)";
+
+                        resultElement.textContent =
+                            data.error ||
+                            "Something went wrong.";
+
+                        return;
+                    }
+
+                    if (data.correct) {
+
+                        resultElement.style.color =
+                            "var(--green)";
+
+                        resultElement.textContent =
+                            data.message || "Object found!";
+
+                        if (data.completed) {
+                            reloading = true;
+                            window.location.reload();
+                            return;
+                        }
+
+                        const objectsList =
+                            document.getElementById(
+                                "objects-list"
+                            );
+
+                        if (
+                            objectsList &&
+                            Array.isArray(data.remaining_objects)
+                        ) {
+                            objectsList.replaceChildren();
+
+                            data.remaining_objects.forEach(
+                                function(name) {
+
+                                    const chip =
+                                        document.createElement("span");
+
+                                    chip.className = "object-chip";
+                                    chip.textContent = "🎯 " + name;
+
+                                    objectsList.appendChild(chip);
+                                }
+                            );
+                        }
+
+                    } else {
+
+                        resultElement.style.color =
+                            "var(--red)";
+
+                        resultElement.textContent =
+                            data.message || "Try again.";
+                    }
+
+                } catch (error) {
+
+                    console.error(error);
+
+                    resultElement.style.color =
+                        "var(--red)";
+
+                    resultElement.textContent =
+                        "Connection error.";
+
+                } finally {
+                    checkingObject = false;
+                }
+            }
+        );
+    }
+
+})();
+</script>
+
+{% endblock %}

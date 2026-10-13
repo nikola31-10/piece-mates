@@ -1,0 +1,46 @@
+
+{% extends "game/base.html" %}
+
+{% block content %}
+
+<div class="form-layout">
+    <div class="form-card">
+
+        <div class="eyebrow">YOUR QUEST AWAITS</div>
+
+        <h1>Your team is counting on you.</h1>
+
+        <p class="form-subtitle">
+            You've been invited to
+            <strong style="color:var(--text)">
+                {{ game_session.name }}
+            </strong>.
+            <br>
+            Theme: {{ game_session.theme }}
+        </p>
+
+        {% if game_session.status == "LOBBY" %}
+
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                {{ form.as_p }}
+
+                <button type="submit" class="btn btn-full">
+                    Join the adventure →
+                </button>
+            </form>
+
+        {% else %}
+
+            <div class="notice">
+                Registration is closed.
+                This session has already started.
+            </div>
+
+        {% endif %}
+
+    </div>
+</div>
+
+{% endblock %}

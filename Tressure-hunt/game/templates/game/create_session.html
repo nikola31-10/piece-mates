@@ -1,0 +1,30 @@
+
+{% extends "game/base.html" %}
+
+{% block content %}
+
+<div class="form-layout">
+    <div class="form-card">
+
+        <div class="eyebrow">CREATE YOUR ADVENTURE</div>
+
+        <h1>Every great team needs a quest.</h1>
+
+        <p class="form-subtitle">
+            Choose your theme, invite your crew, and unlock a one-of-a-kind team photo by solving challenges together.
+        </p>
+
+        <form method="post">
+            {% csrf_token %}
+
+            {{ form.as_p }}
+
+            <button type="submit" class="btn btn-full">
+                Launch my quest →
+            </button>
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}
